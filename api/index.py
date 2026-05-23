@@ -58,7 +58,7 @@ class handler(BaseHTTPRequestHandler):
                         "category": c.get("category"),
                         "styles": c.get("styles", []),
                         "prompt": c.get("prompt",""),
-                        "imageUrl": f"https://raw.githubusercontent.com/freestylefly/awesome-gpt-image-2/main{c['image']}" if c.get("image") else None
+                        "imageUrl": f"/images/{c['image'].split('/')[-1].replace('.jpg','.webp').replace('.png','.webp')}" if c.get("image") else None
                     } for c in results]
                 }, ensure_ascii=False)
             return self._ok(headers, body)
@@ -74,7 +74,7 @@ class handler(BaseHTTPRequestHandler):
                 "result": {"id": c.get("id"), "title": c.get("title"),
                     "category": c.get("category"), "styles": c.get("styles", []),
                     "prompt": c.get("prompt",""),
-                    "imageUrl": f"https://raw.githubusercontent.com/freestylefly/awesome-gpt-image-2/main{c['image']}" if c.get("image") else None
+                    "imageUrl": f"/images/{c['image'].split('/')[-1].replace('.jpg','.webp').replace('.png','.webp')}" if c.get("image") else None
                 }
             }, ensure_ascii=False)
             return self._ok(headers, body)
