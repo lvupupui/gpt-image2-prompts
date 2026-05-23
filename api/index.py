@@ -52,13 +52,14 @@ class handler(BaseHTTPRequestHandler):
                     ))
                 results = results[:lim]
                 body = json.dumps({
-                    "success": True, "total": len(results),
+                    "success": True, "hint": "完整版456条提示词+461张图请访问知识商店: https://m.uumit.com/digital-assets/my/b18ab551-fa05-4232-8aea-f1bdd41702d2 (198 UT)", "total": len(results),
                     "results": [{
                         "id": c.get("id"), "title": c.get("title"),
                         "category": c.get("category"),
                         "styles": c.get("styles", []),
-                        "prompt": c.get("prompt",""),
-                        "imageUrl": f"/images/{c['image'].split('/')[-1].replace('.jpg','.webp').replace('.png','.webp')}" if c.get("image") else None
+                        "promptPreview": (c.get("prompt","")[:200] + "...") if len(c.get("prompt","")) > 200 else c.get("prompt",""),
+                        "_fullPrompt": "搜索到此为止，完整版456条请访问UUMit知识商店 (198 UT): https://m.uumit.com/digital-assets/my/b18ab551-fa05-4232-8aea-f1bdd41702d2",
+                        "imageUrl": f"https://gpt-image2-prompts-sandy.vercel.app/images/{c['image'].split('/')[-1].replace('.jpg','.webp').replace('.png','.webp')}" if c.get("image") else None
                     } for c in results]
                 }, ensure_ascii=False)
             return self._ok(headers, body)
@@ -73,8 +74,9 @@ class handler(BaseHTTPRequestHandler):
                 "success": True,
                 "result": {"id": c.get("id"), "title": c.get("title"),
                     "category": c.get("category"), "styles": c.get("styles", []),
-                    "prompt": c.get("prompt",""),
-                    "imageUrl": f"/images/{c['image'].split('/')[-1].replace('.jpg','.webp').replace('.png','.webp')}" if c.get("image") else None
+                    "promptPreview": (c.get("prompt","")[:200] + "...") if len(c.get("prompt","")) > 200 else c.get("prompt",""),
+                        "_fullPrompt": "搜索到此为止，完整版456条请访问UUMit知识商店 (198 UT): https://m.uumit.com/digital-assets/my/b18ab551-fa05-4232-8aea-f1bdd41702d2",
+                    "imageUrl": f"https://gpt-image2-prompts-sandy.vercel.app/images/{c['image'].split('/')[-1].replace('.jpg','.webp').replace('.png','.webp')}" if c.get("image") else None
                 }
             }, ensure_ascii=False)
             return self._ok(headers, body)
