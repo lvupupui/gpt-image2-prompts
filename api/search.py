@@ -1,128 +1,79 @@
-# GPT Image 2 提示词搜索引擎 — Vercel Python (Serverless)
-# Vercel 会自动把 /api/index.py 映射到 /api/* 路由
-# 用 Flask 或 WSGI 兼容写法
+# GPT Image 2 提示词搜索引擎 — Vercel Flask
+# 调用: /api/search?keyword=奶茶&limit=2 → 下载TXT文件
 
-import json, random
-from urllib.parse import urlparse, parse_qs
+import json, random, os
+from flask import Flask, request, Response, jsonify
 
-# 内嵌数据
-DATA = json.loads("""{"cases":[{"id":1,"title":"城市数据看板信息图","category":"UI & Interfaces","image":"images/case1.webp","styles":["UI","Infographic"],"prompt":"Vertical 9:16 isometric cutaway infographic \\"智慧城市系统蓝图 / Urban Metabolism Atlas\\". Smart city from sky to bedrock: skyscrapers, streets, subway, utility tunnels, water/sewage/gas/heating pipes, fiber, data center, flood tanks, aquifers, geothermal wells, bedrock. Color-coded flows for power/water/data/traffic/waste. 12 numbered panels bilingual CN/EN: 供电系统/给排水管网/通信网络/数据中台/废物处理/交通枢纽/环境监测/公共安全/城市绿化/应急系统/商业服务/社区生活. 24h timeline at bottom. Style: engineering white paper + scientific atlas, light paper bg, crisp lines, 8K. No cyberpunk, no gibberish text, must show both ABOVE AND below ground."}],"cats":[{"name":"UI & Interfaces","count":1,"styles":["UI","Infographic"]}]}""")
-CASES = DATA["cases"]
-CATS = DATA["cats"]
+app = Flask(__name__)
+
+# 从同目录加载数据文件
+data_path = os.path.join(os.path.dirname(__file__), 'data.json')
+with open(data_path, 'r', encoding='utf-8') as f:
+    DATA = json.load(f)
+
+CASES = DATA.get("cases", [])
+CATS = DATA.get("cats", [])
 BASE = "https://gpt-image2-prompts-sandy.vercel.app"
 
-def do_search(keyword, category, limit):
-    kw = keyword.lower().strip() if keyword else ""
-    results = CASES
-    if category:
-        results = [c for c in results if c.get("category","").lower() == category.lower()]
+def search(kw, cat, lim):
+    kw = kw.lower().strip() if kw else ""
+    r = CASES
+    if cat:
+        r = [c for c in r if c.get("category","").lower() == cat.lower()]
     if kw:
-        results = [c for c in results if kw in (
-            c.get("title","") + " " + c.get("prompt","") + " " +
-            " ".join(c.get("styles",[])) + " " + " ".join(c.get("scenes",[]))
-        ).lower()]
-        results = sorted(results, key=lambda c: (
-            -(kw in c.get("title","").lower())*100 - (kw in c.get("prompt","").lower())*10
-        ))
-    return results[:limit]
+        r = [c for c in r if kw in (c.get("title","") + c.get("prompt","") + " ".join(c.get("styles",[])) + " ".join(c.get("scenes",[]))).lower()]
+        r = sorted(r, key=lambda c: -(kw in c.get("title","").lower())*100 - (kw in c.get("prompt","").lower())*10)
+    return r[:lim]
 
-def make_txt(results, keyword):
-    lines = []
-    lines.append("=" * 60)
-    lines.append("GPT Image 2 提示词搜索引擎 - 搜索结果")
-    lines.append("=" * 60)
-    if keyword:
-        lines.append("关键词：" + keyword)
-    lines.append("匹配结果：" + str(len(results)) + " 条")
-    lines.append("完整版456条提示词请访问UUMit知识商店（198 UT）：")
-    lines.append("https://m.uumit.com/digital-assets/my/b18ab551-fa05-4232-8aea-f1bdd41702d2")
-    lines.append("=" * 60)
-    lines.append("")
+def gen_txt(results, kw):
+    L = []
+    L.append("=" * 60)
+    L.append("GPT Image 2 提示词搜索引擎 - 搜索结果")
+    L.append("=" * 60)
+    if kw: L.append("关键词：" + kw)
+    L.append("匹配结果：" + str(len(results)) + " 条")
+    L.append("完整版456条提示词+461张图：UUMit知识商店 198 UT")
+    L.append("https://m.uumit.com/digital-assets/my/b18ab551-fa05-4232-8aea-f1bdd41702d2")
+    L.append("=" * 60)
+    L.append("")
     for i, c in enumerate(results, 1):
-        lines.append("-" * 60)
-        lines.append("【" + str(i) + "】#" + str(c.get("id","")) + " " + c.get("title",""))
-        styles_str = "、".join(c.get("styles",[]))
-        lines.append("   分类：" + c.get("category","") + " | 风格：" + styles_str)
+        L.append("-" * 60)
+        L.append(f"【{i}】#{c.get('id','')} {c.get('title','')}")
+        L.append(f"   分类：{c.get('category','')} | 风格：{'、'.join(c.get('styles',[]))}")
         if c.get("image"):
-            img_name = c["image"].split("/")[-1].replace(".jpg",".webp").replace(".png",".webp")
-            lines.append("   参考图：https://gpt-image2-prompts-sandy.vercel.app/images/" + img_name)
-        prompt = c.get("prompt","")
-        if len(prompt) > 300:
-            prompt = prompt[:300] + "..."
-        lines.append("   提示词预览：")
-        for pl in prompt.split("\n"):
-            lines.append("     " + pl)
-        lines.append("")
-    lines.append("=" * 60)
-    lines.append("完整版456条提示词+461张图：UUMit知识商店 198 UT")
-    lines.append("https://m.uumit.com/digital-assets/my/b18ab551-fa05-4232-8aea-f1bdd41702d2")
-    lines.append("=" * 60)
-    return "\n".join(lines)
+            fn = c["image"].split("/")[-1].replace(".jpg",".webp").replace(".png",".webp")
+            L.append(f"   参考图：{BASE}/images/{fn}")
+        p = c.get("prompt","")
+        if len(p) > 300: p = p[:300] + "..."
+        L.append("   提示词预览：")
+        for l in p.split("\n"): L.append("     " + l)
+        L.append("")
+    L.append("=" * 60)
+    L.append("完整版456条提示词+461张图：UUMit知识商店 198 UT")
+    L.append("https://m.uumit.com/digital-assets/my/b18ab551-fa05-4232-8aea-f1bdd41702d2")
+    L.append("=" * 60)
+    return "\n".join(L)
 
-def handler(event, context):
-    path = event.get("path", "/")
-    method = event.get("httpMethod", "GET")
-    params = event.get("queryStringParameters") or {}
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def catch_all(path):
+    p = "/" + path.rstrip("/") if path else "/"
+    kw = request.args.get("keyword", "")
+    cat = request.args.get("category", "")
+    lim = min(int(request.args.get("limit", "5")), 20)
     
-    kw = params.get("keyword", "")
-    cat = params.get("category", "")
-    lim = min(int(params.get("limit", "5")), 20)
-    
-    headers = {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS"
-    }
-    
-    if method == "OPTIONS":
-        return {"statusCode": 204, "headers": headers, "body": ""}
-    
-    path = path.rstrip("/")
-    
-    # API info
-    if path in ("", "/", "/api", "/api/search"):
+    if p in ("/", "/api", "/api/search"):
         if not kw and not cat:
-            return {
-                "statusCode": 200,
-                "headers": {**headers, "Content-Type": "application/json"},
-                "body": json.dumps({
-                    "name": "GPT Image 2 提示词搜索引擎",
-                    "usage": "GET /api/search?keyword=奶茶&limit=5",
-                    "price": "10 UT/次，返回TXT文件含参考图链接+提示词预览"
-                }, ensure_ascii=False)
-            }
-        
-        results = do_search(kw, cat, lim)
-        txt = make_txt(results, kw)
-        fname = "gpt-image2-search-" + (kw or "all") + ".txt"
-        
-        return {
-            "statusCode": 200,
-            "headers": {
-                **headers,
-                "Content-Type": "text/plain; charset=utf-8",
-                "Content-Disposition": 'attachment; filename="' + fname + '"'
-            },
-            "body": txt
-        }
+            return jsonify({"name": "GPT Image 2 提示词搜索引擎", "usage": "/api/search?keyword=奶茶&limit=5", "price": "10 UT/次，返回TXT下载"})
+        txt = gen_txt(search(kw, cat, lim), kw)
+        fn = "gpt-image2-search-" + (kw or "all") + ".txt"
+        return Response(txt, mimetype="text/plain; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{fn}"'})
     
-    if path == "/api/categories":
-        return {
-            "statusCode": 200,
-            "headers": {**headers, "Content-Type": "application/json"},
-            "body": json.dumps({"success": True, "total": len(CATS), "categories": CATS}, ensure_ascii=False)
-        }
+    if p == "/api/categories":
+        return jsonify({"success": True, "total": len(CATS), "categories": CATS})
     
-    if path == "/api/random":
+    if p == "/api/random":
         c = random.choice(CASES) if CASES else {}
-        txt = make_txt([c], "")
-        return {
-            "statusCode": 200,
-            "headers": {**headers, "Content-Type": "text/plain; charset=utf-8", "Content-Disposition": 'attachment; filename="gpt-image2-random.txt"'},
-            "body": txt
-        }
+        return Response(gen_txt([c], ""), mimetype="text/plain; charset=utf-8", headers={"Content-Disposition": 'attachment; filename="gpt-image2-random.txt"'})
     
-    return {
-        "statusCode": 404,
-        "headers": {**headers, "Content-Type": "application/json"},
-        "body": json.dumps({"error": "not found"})
-    }
+    return jsonify({"error": "not found"}), 404
